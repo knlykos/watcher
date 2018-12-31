@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func main() {
-	url := "http://localhost:3000/cove?type=csv"
+	url := "http://cove.nkodexsoft.com:3000/cove/csv"
 
 	w := watcher.New()
 
@@ -23,39 +24,43 @@ func main() {
 	// w.SetMaxEvents(1)
 
 	// Only notify rename and move events.
-	// w.FilterOps(watcher.Rename, watcher.Move)
+	w.FilterOps(watcher.Move, watcher.Create)
 
 	// Only files that match the regular expression during file listings
 	// will be watched.
 	// r := regexp.MustCompile("^abc$")
 	// w.AddFilterHook(watcher.RegexFilterHook(r, false))
+	r := regexp.MustCompile(".csv$")
+	w.AddFilterHook(watcher.RegexFilterHook(r, false))
 
 	go func() {
 		for {
 			select {
 			case event := <-w.Event:
-				// fmt.Println("event.Path", (event.Path == "-"))
-				dat, err := ioutil.ReadFile(event.Path)
-				if err != nil {
-					log.Fatalln(err)
-				}
-				fmt.Println(string(dat))
-				payload := strings.NewReader(string(dat))
-				req, _ := http.NewRequest("POST", url, payload)
-				fmt.Println(req)
+				fmt.Println(event.Op)
+				if event.FileInfo.IsDir() == false {
+					dat, err := ioutil.ReadFile(event.Path)
+					if err != nil {
+						fmt.Println(err)
+					}
+					fmt.Println(string(dat))
+					payload := strings.NewReader(string(dat))
+					req, _ := http.NewRequest("POST", url, payload)
+					fmt.Println(req)
 
-				req.Header.Add("Content-Type", "application/json")
-				req.Header.Add("cache-control", "no-cache")
-				res, err := http.DefaultClient.Do(req)
-				if err != nil {
-					log.Fatalln(err)
-				}
-				// fmt.Println(res)
-				body, _ := ioutil.ReadAll(res.Body)
-				fmt.Println(body)
+					req.Header.Add("Content-Type", "application/json")
+					req.Header.Add("cache-control", "no-cache")
+					res, err := http.DefaultClient.Do(req)
+					if err != nil {
+						log.Fatalln(err)
+					}
+					// fmt.Println(res)
+					body, _ := ioutil.ReadAll(res.Body)
+					fmt.Println(body)
 
-				// fmt.Println(res)
-				// fmt.Println(string(body))
+					fmt.Println(res)
+					fmt.Println(string(body))
+				}
 
 			case err := <-w.Error:
 				log.Fatalln(err)
